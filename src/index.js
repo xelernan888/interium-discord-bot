@@ -11,6 +11,11 @@ import {
   ChannelType,
 } from "discord.js";
 import {
+  attachLevels,
+  formatLevelCard,
+  setupLevelSystem,
+} from "./levels.js";
+import {
   attachProtection,
   clearRaidMode,
   raidStatus,
@@ -83,6 +88,15 @@ const commands = [
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("level")
+    .setDescription("Your level and XP on this server")
+    .setDMPermission(false),
+  new SlashCommandBuilder()
+    .setName("level-setup")
+    .setDescription("Create level roles and chat permissions (Lvl 1/5/10/15)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setDMPermission(false),
 ];
 
 const commandBody = commands.map((command) => command.toJSON());
@@ -97,6 +111,7 @@ const client = new Client({
 });
 
 attachProtection(client);
+attachLevels(client);
 
 async function registerGuildCommands(appId, guildId) {
   const rest = new REST({ version: "10" }).setToken(token);
@@ -125,7 +140,9 @@ client.once(Events.ClientReady, async (ready) => {
       );
     }
   }
-  console.log("Commands: /setup  /verify-panel  /ticket-panel  /lockdown");
+  console.log(
+    "Commands: /setup  /verify-panel  /ticket-panel  /level  /level-setup  /lockdown"
+  );
 });
 
 client.on(Events.GuildCreate, async (guild) => {
@@ -188,6 +205,45 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: `Lockdown on for ${minutes} minutes.`,
         flags: MessageFlags.Ephemeral,
       });
+      return;
+    }
+
+    if (interaction.commandName === "level") {
+      await interaction.reply({
+        content: formatLevelCard(
+          interaction.guild.id,
+          interaction.user.id,
+          interaction.user.tag
+        ),
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    if (interaction.commandName === "level-setup") {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({
+          content: "Only Administrators.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await setupLevelSystem(interaction.guild);
+      await interaction.editReply(
+        [
+          "Level system is ready.",
+          "Roles: Lvl 1 · Lvl 5 · Lvl 10 · Lvl 15",
+          "Channels: general, media, offtopic, redeem, purchase-help",
+          "",
+          "**Lvl 1** — text only",
+          "**Lvl 5** — GIFs & embeds",
+          "**Lvl 10** — image uploads",
+          "**Lvl 15** — stickers & reactions",
+          "",
+          "XP from messages (~45s cooldown). Users check `/level`.",
+        ].join("\n")
+      );
       return;
     }
 
