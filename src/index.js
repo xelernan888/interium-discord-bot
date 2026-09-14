@@ -12,8 +12,8 @@ import {
 } from "discord.js";
 import {
   attachLevels,
-  formatLevelCard,
   setupLevelSystem,
+  showLevel,
 } from "./levels.js";
 import {
   attachProtection,
@@ -209,12 +209,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.commandName === "level") {
+      const card = await showLevel(interaction);
       await interaction.reply({
-        content: formatLevelCard(
-          interaction.guild.id,
-          interaction.user.id,
-          interaction.user.tag
-        ),
+        content: card,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -229,20 +226,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      await setupLevelSystem(interaction.guild);
+      const result = await setupLevelSystem(interaction.guild);
       await interaction.editReply(
         [
           "Level system is ready.",
           "Roles: Lvl 1 · Lvl 5 · Lvl 10 · Lvl 15",
-          "Channels: general, media, offtopic, redeem, purchase-help",
+          `Roles given: ${result.assigned}. Failed: ${result.failed}.`,
+          result.failed
+            ? "If failed > 0: put the **bot role above** Lvl 1 / 5 / 10 / 15, then run /level-setup again."
+            : "",
           "",
-          "**Lvl 1** — text only",
-          "**Lvl 5** — GIFs & embeds",
+          "**Lvl 1** — text only (GIFs deleted)",
+          "**Lvl 5** — GIFs",
           "**Lvl 10** — image uploads",
-          "**Lvl 15** — stickers & reactions",
-          "",
-          "XP from messages (~45s cooldown). Users check `/level`.",
-        ].join("\n")
+          "**Lvl 15** — stickers",
+        ]
+          .filter(Boolean)
+          .join("\n")
       );
       return;
     }
